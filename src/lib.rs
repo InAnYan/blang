@@ -4,3 +4,4 @@ mod token;
 mod scanner;
 mod parser;
 mod error_reporter;
+mod validator;

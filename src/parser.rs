@@ -62,20 +62,21 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse(&mut self) -> Vec<Decl> {
-        let mut res = Vec::new();
+    pub fn is_at_end(&mut self) -> bool {
+        self.current_token.kind == TokenType::EndOfFile
+    }
 
-        while !self.is_at_end() {
-            match self.parse_decl() {
-                Ok(decl) => res.push(decl),
-                Err(e) => {
-                    report_error(&e.pos, &e.msg);
-                    self.synchronize_decl()
-                }
+    pub fn parse_one_decl(&mut self) -> Option<Decl> {
+        let decl = self.parse_decl();
+        
+        match decl {
+            Ok(d) => Some(d),
+            Err(e) => {
+                report_error(&e.pos, &e.msg);
+                self.synchronize_decl();
+                None
             }
         }
-
-        res
     }
 
     pub fn had_error(&self) -> bool {
@@ -93,17 +94,13 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn is_at_end(&self) -> bool {
-        self.current_token.kind == TokenType::EndOfFile
-    }
-
     fn parse_decl(&mut self) -> Result<Decl, ParserError> {
         if self.matching(TokenType::Identifier) {
             let name = self.previous_token.clone();
             if self.matching(TokenType::LeftParen) {
                 self.continue_parse_fn(name)
             } else {
-                self.continue_parse_var(name)
+                self.continue_parse_var_decl(name)
             }
         } else {
             Err(self.error_at_current("expected declaration"))
@@ -135,33 +132,32 @@ impl<'a> Parser<'a> {
     }
     
     fn parse_auto_stmt(&mut self) -> Result<Stmt, ParserError> {
-        let name = self.require(TokenType::Identifier, "expected variable name")?;
-
-        let var = self.continue_parse_fn(name)?;
-        let kind = match var.kind {
-            DeclKind::Data { name, count, initial } => StmtKind::Auto(name, count, initial),
-            _ => panic!()
-        };
+        let token = self.previous_token.clone();
+        let var = self.parse_var()?;
 
         Ok(Stmt {
-            pos: var.pos,
-            kind
+            pos: token.pos,
+            kind: StmtKind::Auto(var)
         })
     }
 
-    fn continue_parse_var(&mut self, name: Token) -> Result<Decl, ParserError> {
-        let count = if self.matching(TokenType::LeftBrace) {
-            let count_token = self.require(TokenType::IntLiteral, "expected size of array")?;
-            self.require(TokenType::RightBrace, "expected ']' after array size")?;
+    fn continue_parse_var_decl(&mut self, name: Token) -> Result<Decl, ParserError> {
+        let pos = name.pos.clone();
+        let var = self.continue_parse_var(name)?;
 
-            match count_token.data.parse::<i32>() {
-                Ok(num) => num,
-                Err(e) => return Err(self.error_at_current(&e.to_string()))
-            }
-        } else {
-            1
-        };
+        Ok(Decl {
+            pos,
+            kind: DeclKind::External(var)
+        })
+    }
 
+    fn parse_var(&mut self) -> Result<Variable, ParserError> {
+        let name = self.require(TokenType::Identifier, "expected variable name")?;
+
+        self.continue_parse_var(name)
+    }
+
+    fn continue_parse_var(&mut self, name: Token) -> Result<Variable, ParserError> {
         let initial = if !self.matching(TokenType::Semicolon) {
             let res = self.parse_expr()?;
             self.require(TokenType::Semicolon, "expected ';' at the end of declaration")?;
@@ -169,15 +165,8 @@ impl<'a> Parser<'a> {
         } else {
             None
         };
-
-        Ok(Decl {
-            pos: name.pos,
-            kind: DeclKind::Data {
-                name: name.data,
-                count,
-                initial
-            }
-        })
+        
+        Ok(Variable(name.data, initial))
     }
 
     fn parse_extern_stmt(&mut self) -> Result<Stmt, ParserError> {

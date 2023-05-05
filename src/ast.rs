@@ -5,6 +5,8 @@ pub struct Decl {
     pub kind: DeclKind
 }
 
+pub struct Variable(pub String, pub Option<Expr>);
+
 pub enum DeclKind {
     Function {
         name: String,
@@ -12,11 +14,7 @@ pub enum DeclKind {
         body: Stmt
     },
 
-    Data {
-        name: String,
-        count: i32,
-        initial: Option<Expr>
-    }
+    External(Variable)
 }
 
 pub struct Stmt {
@@ -27,7 +25,7 @@ pub struct Stmt {
 pub enum StmtKind {
     Block(Vec<Stmt>),
     Expr(Expr),
-    Auto(String, i32, Option<Expr>),
+    Auto(Variable),
     Extern(String),
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     While(Expr, Box<Stmt>),
