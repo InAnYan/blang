@@ -1,4 +1,4 @@
-use crate::{file::*, token::*, error_reporter::report_error};
+use crate::{file::*, token::*};
 use std::rc::Rc;
 
 pub struct Scanner {
@@ -62,9 +62,11 @@ impl Scanner {
 
                 b'-' => if self.matching(b'-') {
                     self.make_token(TokenType::MinusMinus)
+                } else if is_digit(self.peek().map_or(b'_', |ch| *ch)) {
+                    self.number()
                 } else {
                     self.make_token(TokenType::Minus)
-                }
+                },
 
                 b'!' => if self.matching(b'=') {
                     self.make_token(TokenType::BangEqual)
@@ -135,12 +137,12 @@ impl Scanner {
         if self.is_at_end() {
             self.make_error_token("expected character")
         } else {
-            let character = self.advance();
+            self.advance(); // Consume character.
 
             if self.is_at_end() {
                 self.make_error_token("unterminated character literal")
             } else {
-                self.advance(); // consume '.
+                self.advance(); // Consume '.
                 self.make_token(TokenType::CharLiteral)
             }
         }
@@ -154,7 +156,7 @@ impl Scanner {
         if self.is_at_end() {
             self.make_error_token("unterminated character literal")
         } else {
-            self.advance(); // consume ".
+            self.advance(); // Consume ".
             self.make_token(TokenType::StringLiteral)
         }
     }
@@ -187,7 +189,6 @@ impl Scanner {
                 TokenType::Identifier
             }
             
-            b'e' => self.check_rest(1, b"lse", TokenType::KeywordElse),
             b'w' => self.check_rest(1, b"hile", TokenType::KeywordWhile),
             b'd' => self.check_rest(1, b"o", TokenType::KeywordDo),
             b'b' => self.check_rest(1, b"reak", TokenType::KeywordBreak),

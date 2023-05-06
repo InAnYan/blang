@@ -284,6 +284,13 @@ impl<'a> Parser<'a> {
             let expr = self.parse_expr()?;
             self.require(TokenType::RightParen, "expected ')' after expression")?;
             Ok(expr)
+            
+        } else if self.matching(TokenType::StringLiteral) {
+            let lit = self.previous_token.clone();
+            Ok(Expr {
+                pos: lit.pos,
+                kind: ExprKind::StringLit(lit.data)
+            })
         } else {
             Err(self.error_at_current("expected expression"))
         }?;
@@ -459,11 +466,15 @@ impl<'a> Parser<'a> {
         let condition = self.parse_expr()?;
         self.require(TokenType::RightParen, "expected ')' after while loop condition")?;
 
-        let body = self.parse_stmt()?;
+        let body = if !self.matching(TokenType::Semicolon) {
+            Some(Box::new(self.parse_stmt()?))
+        } else {
+            None
+        };
 
         Ok(Stmt {
             pos: while_token.pos,
-            kind: StmtKind::While(condition, Box::new(body))
+            kind: StmtKind::While(condition, body)
         })
     }
 
@@ -485,7 +496,7 @@ impl<'a> Parser<'a> {
     
     fn parse_break_stmt(&mut self) -> Result<Stmt, ParserError> {
         let token = self.previous_token.clone();
-        self.require(TokenType::Semicolon, "expected ';' after break statement")?;
+        self.require_and_skip_semicolons("after break statement")?;
 
         Ok(Stmt {
             pos: token.pos,
@@ -495,7 +506,7 @@ impl<'a> Parser<'a> {
     
     fn parse_continue_stmt(&mut self) -> Result<Stmt, ParserError> {
         let token = self.previous_token.clone();
-        self.require(TokenType::Semicolon, "expected ';' after continue statement")?;
+        self.require_and_skip_semicolons("after continue statement")?;
 
         Ok(Stmt {
             pos: token.pos,
@@ -522,6 +533,16 @@ impl<'a> Parser<'a> {
 
     fn check(&self, kind: TokenType) -> bool {
         self.current_token.kind == kind
+    }
+
+    fn require_and_skip_semicolons(&mut self, msg: &str) -> Result<(), ParserError> {
+        self.require(TokenType::Semicolon, &format!("expected ';' {}", msg))?;
+
+        while self.matching(TokenType::Semicolon) {
+
+        }
+
+        Ok(())
     }
 
     fn advance(&mut self) {

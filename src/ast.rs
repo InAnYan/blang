@@ -28,7 +28,7 @@ pub enum StmtKind {
     Auto(Variable),
     Extern(String),
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
-    While(Expr, Box<Stmt>),
+    While(Expr, Option<Box<Stmt>>),
     DoWhile(Expr, Box<Stmt>),
     Return(Option<Expr>),
     Break,
